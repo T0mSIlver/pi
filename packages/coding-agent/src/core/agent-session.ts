@@ -3194,7 +3194,8 @@ export class AgentSession {
 				// Small windows may hold less than keepRecentTokens, so retry with a smaller kept tail.
 				const keepRecentTokens = Math.min(settings.keepRecentTokens, Math.floor(model.contextWindow / 4));
 				preparation = prepareCompaction(pathEntries, { ...settings, keepRecentTokens });
-				if (!preparation) {
+				// Report only a failed recovery; a completed response has nothing to retry.
+				if (!preparation && willRetry) {
 					const errorMessage =
 						"Context overflow recovery failed: nothing could be compacted. The context window may be too small.";
 					this._emit({
