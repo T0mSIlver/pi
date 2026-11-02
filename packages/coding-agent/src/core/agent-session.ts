@@ -3189,7 +3189,32 @@ export class AgentSession {
 			}
 
 			const pathEntries = this.sessionManager.getBranch();
-			const preparation = prepareCompaction(pathEntries, settings);
+			let preparation = prepareCompaction(pathEntries, settings);
+			if (!preparation && reason === "overflow") {
+				// Small windows may hold less than keepRecentTokens, so retry with a smaller kept tail.
+				const keepRecentTokens = Math.min(settings.keepRecentTokens, Math.floor(model.contextWindow / 4));
+				preparation = prepareCompaction(pathEntries, { ...settings, keepRecentTokens });
+				if (!preparation) {
+					const errorMessage =
+						"Context overflow recovery failed: nothing could be compacted. The context window may be too small.";
+					this._emit({
+						type: "compaction_end",
+						reason,
+						result: undefined,
+						aborted: false,
+						willRetry: false,
+						errorMessage,
+					});
+					await this._emitSessionCompactFailed({
+						reason,
+						errorMessage,
+						aborted: false,
+						willRetry: false,
+						fromExtension: false,
+					});
+					return false;
+				}
+			}
 			if (!preparation) {
 				return false;
 			}
